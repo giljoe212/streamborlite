@@ -4,11 +4,13 @@ Aplikasi web sederhana untuk melakukan live streaming ke YouTube menggunakan FFm
 
 ## Fitur
 
-- Stream video langsung dari Google Drive ke YouTube
+- Stream video langsung dari berbagai sumber (Google Drive, URL langsung)
+- Dukungan format MP4 dengan codec H.264/AAC
 - Tanpa encoding (menggunakan stream copy)
 - Antarmuka web yang mudah digunakan
 - Status streaming real-time
 - Log aktivitas
+- Optimasi untuk streaming jangka panjang
 
 ## Persyaratan
 
@@ -47,12 +49,35 @@ Aplikasi web sederhana untuk melakukan live streaming ke YouTube menggunakan FFm
 
 2. Buka browser dan akses `http://localhost:3000`
 
-3. Masukkan detail streaming:
-   - RTMP URL: Dapatkan dari YouTube Studio (biasanya `rtmp://a.rtmp.youtube.com/live2`)
-   - Stream Key: Dapatkan dari YouTube Studio
-   - Google Drive Video URL: URL shareable dari video di Google Drive
+3. Dapatkan Stream Key dari YouTube Studio:
+   - Buka [YouTube Studio](https://studio.youtube.com/)
+   - Pilih "Go Live" di menu kiri
+   - Pilih tab "Stream"
+   - Salin "Stream Key" (kode panjang di bagian bawah)
 
-4. Klik "Start Stream" untuk memulai streaming
+4. Masukkan detail streaming:
+   - **Stream Key**: Tempel kode yang sudah disalin
+   - **Video URL**:
+     - Untuk Google Drive:
+       1. Upload video ke Google Drive
+       2. Klik kanan file > Dapatkan link
+       3. Pastikan akses "Anyone with the link"
+       4. Salin URL-nya
+     - Atau gunakan URL langsung ke file MP4
+
+5. Klik "Start Stream" untuk memulai streaming
+
+### Format Video yang Direkomendasikan
+- Video: H.264 (AVC)
+- Audio: AAC
+- Resolusi: 1920x1080 (1080p) atau 1280x720 (720p)
+- Bitrate: Sesuai standar YouTube Live
+- Container: MP4
+
+### Catatan Penting
+- Pastikan video sudah dalam format yang kompatibel
+- Untuk hasil terbaik, gunakan video dengan bitrate konstan (CBR)
+- Pastikan koneksi internet stabil untuk streaming lancar
 
 ## Deploy ke Railway
 
