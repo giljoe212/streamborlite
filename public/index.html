@@ -59,15 +59,52 @@
                         <p class="mt-1 text-xs text-gray-500">Dapatkan Stream Key dari YouTube Studio > Live Streaming</p>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Video URL</label>
-                        <input type="text" id="videoUrl" class="w-full px-3 py-2 border border-gray-300 rounded-md" 
-                               placeholder="https://...">
-                        <p class="text-xs text-gray-500 mt-1">
-                            Dukungan format:<br>
-                            - Google Drive: Paste URL shareable<br>
-                            - File MP4 langsung: http://example.com/video.mp4<br>
-                            Format video yang direkomendasikan: H.264, AAC audio, 1920x1080 (1080p)
-                        </p>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Video Source</label>
+                        
+                        <!-- Tab Pilihan -->
+                        <div class="flex mb-2 border-b
+                            <button type="button" id="tabUrl" class="px-4 py-2 font-medium border-b-2 border-blue-500 text-blue-600">
+                                From URL
+                            </button>
+                            <button type="button" id="tabUpload" class="px-4 py-2 font-medium text-gray-500">
+                                Upload File
+                            </button>
+                        </div>
+                        
+                        <!-- Tab Content: URL -->
+                        <div id="urlTabContent">
+                            <input type="text" id="videoUrl" class="w-full px-3 py-2 border border-gray-300 rounded-md mb-2" 
+                                   placeholder="https://drive.google.com/... atau http://example.com/video.mp4">
+                            <button type="button" id="convertDriveUrl" class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded mb-2">
+                                Convert Google Drive URL
+                            </button>
+                            <p class="text-xs text-gray-500">
+                                Dukungan format:<br>
+                                - Google Drive: Paste URL shareable<br>
+                                - File MP4 langsung: http://example.com/video.mp4
+                            </p>
+                        </div>
+                        
+                        <!-- Tab Content: Upload -->
+                        <div id="uploadTabContent" class="hidden">
+                            <div class="border-2 border-dashed border-gray-300 rounded-md p-6 text-center">
+                                <input type="file" id="fileInput" class="hidden" accept="video/*">
+                                <label for="fileInput" class="cursor-pointer">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                    </svg>
+                                    <p class="mt-1 text-sm text-gray-600">Click to upload or drag and drop</p>
+                                    <p class="text-xs text-gray-500 mt-1">MP4, AVI, MOV up to 50MB</p>
+                                </label>
+                            </div>
+                            <div id="uploadProgress" class="mt-2 hidden">
+                                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                    <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                                </div>
+                                <p id="uploadStatus" class="text-xs text-gray-600 mt-1">Uploading: 0%</p>
+                            </div>
+                        </div>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -195,6 +232,102 @@
         checkStatus();
         // Check status every 5 seconds
         setInterval(checkStatus, 5000);
+
+        // Tab Navigation
+        document.getElementById('tabUrl').addEventListener('click', () => {
+            document.getElementById('urlTabContent').classList.remove('hidden');
+            document.getElementById('uploadTabContent').classList.add('hidden');
+            document.getElementById('tabUrl').classList.add('border-blue-500', 'text-blue-600');
+            document.getElementById('tabUrl').classList.remove('text-gray-500');
+            document.getElementById('tabUpload').classList.remove('border-blue-500', 'text-blue-600');
+            document.getElementById('tabUpload').classList.add('text-gray-500');
+        });
+
+        document.getElementById('tabUpload').addEventListener('click', () => {
+            document.getElementById('urlTabContent').classList.add('hidden');
+            document.getElementById('uploadTabContent').classList.remove('hidden');
+            document.getElementById('tabUpload').classList.add('border-blue-500', 'text-blue-600');
+            document.getElementById('tabUpload').classList.remove('text-gray-500');
+            document.getElementById('tabUrl').classList.remove('border-blue-500', 'text-blue-600');
+            document.getElementById('tabUrl').classList.add('text-gray-500');
+        });
+
+        // Google Drive URL Converter
+        document.getElementById('convertDriveUrl').addEventListener('click', () => {
+            const urlInput = document.getElementById('videoUrl');
+            const url = urlInput.value.trim();
+            
+            if (!url.includes('drive.google.com')) {
+                alert('URL Google Drive tidak valid');
+                return;
+            }
+            
+            // Extract file ID
+            const fileIdMatch = url.match(/[\w-]{20,}/);
+            if (!fileIdMatch || !fileIdMatch[0]) {
+                alert('Tidak dapat menemukan ID file di URL');
+                return;
+            }
+            
+            const fileId = fileIdMatch[0];
+            const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
+            
+            urlInput.value = directUrl;
+            alert('URL Google Drive telah dikonversi!');
+        });
+
+        // File Upload Handler
+        const fileInput = document.getElementById('fileInput');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const progressBar = document.getElementById('progressBar');
+        const uploadStatus = document.getElementById('uploadStatus');
+        
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            // Validate file size (50MB max)
+            if (file.size > 50 * 1024 * 1024) {
+                alert('Ukuran file maksimal 50MB');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('video', file);
+            
+            uploadProgress.classList.remove('hidden');
+            
+            try {
+                const xhr = new XMLHttpRequest();
+                
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = Math.round((e.loaded / e.total) * 100);
+                        progressBar.style.width = percentComplete + '%';
+                        uploadStatus.textContent = `Uploading: ${percentComplete}%`;
+                    }
+                };
+                
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
+                        const response = JSON.parse(xhr.responseText);
+                        document.getElementById('videoUrl').value = response.url;
+                        alert('File berhasil diupload! URL telah disalin ke kolom URL.');
+                    } else {
+                        alert('Upload gagal: ' + xhr.responseText);
+                    }
+                    uploadProgress.classList.add('hidden');
+                };
+                
+                xhr.open('POST', '/api/upload', true);
+                xhr.send(formData);
+                
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Terjadi kesalahan saat mengupload file');
+                uploadProgress.classList.add('hidden');
+            }
+        });
     </script>
 </body>
 </html>

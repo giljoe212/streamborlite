@@ -1,5 +1,3 @@
-
-
 require('dotenv').config();
 const express = require('express');
 const fileUpload = require('express-fileupload');
@@ -7,9 +5,30 @@ const cors = require('cors');
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Configure multer for file uploads
+const upload = multer({
+    dest: 'uploads/',
+    limits: {
+        fileSize: 50 * 1024 * 1024, // 50MB max file size
+    },
+    fileFilter: (req, file, cb) => {
+        // Accept video files only
+        if (!file.mimetype.startsWith('video/')) {
+            return cb(new Error('Hanya file video yang diperbolehkan'));
+        }
+        cb(null, true);
+    },
+});
+
+// Create uploads directory if it doesn't exist
+if (!fs.existsSync('uploads')) {
+    fs.mkdirSync('uploads');
+}
 
 // Middleware
 app.use(cors());
@@ -182,6 +201,31 @@ app.get('/api/stream/status', (req, res) => {
         videoPath: streamStatus.videoPath
     });
 });
+
+// Handle file uploads
+app.post('/api/upload', upload.single('video'), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'Tidak ada file yang diupload' });
+        }
+
+        // In a production environment, you would upload this to a CDN or cloud storage
+        // For now, we'll just return the local file path
+        const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        
+        res.json({
+            success: true,
+            url: fileUrl,
+            filename: req.file.originalname
+        });
+    } catch (error) {
+        console.error('Upload error:', error);
+        res.status(500).json({ error: 'Gagal mengupload file' });
+    }
+});
+
+// Serve uploaded files
+app.use('/uploads', express.static('uploads'));
 
 // Start the server
 app.listen(PORT, () => {
