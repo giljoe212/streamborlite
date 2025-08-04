@@ -6,6 +6,10 @@ const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const https = require('https');
+const { promisify } = require('util');
+const stream = require('stream');
+const pipeline = promisify(stream.pipeline);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -74,13 +78,86 @@ app.post('/api/stream/start', async (req, res) => {
             const fileIdMatch = videoUrl.match(/[\w-]{20,}/);
             if (fileIdMatch && fileIdMatch[0]) {
                 const fileId = fileIdMatch[0];
-                // Gunakan API Google Drive v3 untuk mendapatkan download URL
-                processedUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=YOUR_API_KEY`;
                 
-                // Alternatif: Gunakan URL dengan konfirmasi
-                processedUrl = `https://drive.google.com/uc?export=download&confirm=t&id=${fileId}`;
-                
-                console.log('Converted Google Drive URL:', processedUrl);
+                try {
+                    // Create temp directory if not exists
+                    const tempDir = path.join(__dirname, 'temp');
+                    if (!fs.existsSync(tempDir)) {
+                        fs.mkdirSync(tempDir, { recursive: true });
+                    }
+                    
+                    // Generate unique filename
+                    const filename = `temp_${Date.now()}.mp4`;
+                    const filePath = path.join(tempDir, filename);
+                    
+                    // Download file first
+                    await new Promise((resolve, reject) => {
+                        const fileUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+                        const fileStream = fs.createWriteStream(filePath);
+                        
+                        console.log(`Downloading file from Google Drive: ${fileId}`);
+                        
+                        const downloadWithRetry = (url, retries = 3) => {
+                            const request = https.get(url, (response) => {
+                                // Handle redirects
+                                if (response.statusCode === 302 || response.statusCode === 301) {
+                                    console.log('Redirecting to:', response.headers.location);
+                                    downloadWithRetry(response.headers.location, retries);
+                                    return;
+                                }
+                                
+                                // Check if the response is a file
+                                const contentType = response.headers['content-type'] || '';
+                                if (!contentType.startsWith('video/') && !contentType.includes('octet-stream')) {
+                                    reject(new Error('URL tidak mengarah ke file video yang valid'));
+                                    return;
+                                }
+                                
+                                // Pipe the response to file
+                                response.pipe(fileStream);
+                                
+                                fileStream.on('finish', () => {
+                                    fileStream.close();
+                                    console.log('Download completed:', filePath);
+                                    resolve();
+                                });
+                            });
+                            
+                            request.on('error', (err) => {
+                                console.error('Download error:', err);
+                                if (retries > 0) {
+                                    console.log(`Retrying... (${retries} attempts left)`);
+                                    setTimeout(() => downloadWithRetry(url, retries - 1), 1000);
+                                } else {
+                                    fs.unlink(filePath, () => {}); // Delete the file async
+                                    reject(new Error('Gagal mengunduh file dari Google Drive setelah beberapa kali percobaan'));
+                                }
+                            });
+                            
+                            // Set timeout
+                            request.setTimeout(30000, () => {
+                                request.destroy();
+                                console.error('Download timeout');
+                                if (retries > 0) {
+                                    console.log(`Retrying... (${retries} attempts left)`);
+                                    setTimeout(() => downloadWithRetry(url, retries - 1), 1000);
+                                } else {
+                                    fs.unlink(filePath, () => {});
+                                    reject(new Error('Timeout saat mengunduh file'));
+                                }
+                            });
+                        };
+                        
+                        // Start the download
+                        downloadWithRetry(fileUrl);
+                    });
+                    
+                    // Use the downloaded file with a local URL
+                    processedUrl = `http://localhost:${PORT}/temp/${path.basename(filePath)}`;
+                } catch (error) {
+                    console.error('Error downloading file:', error);
+                    return res.status(500).json({ error: 'Gagal mengunduh file dari Google Drive' });
+                }
             } else {
                 console.error('Invalid Google Drive URL format');
                 return res.status(400).json({ error: 'Format URL Google Drive tidak valid. Pastikan URL berisi ID file yang benar.' });
@@ -226,6 +303,27 @@ app.post('/api/upload', upload.single('video'), (req, res) => {
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
+
+// Serve downloaded temp files
+app.use('/temp', express.static('temp'));
+
+// Clean up temp files on server start
+const cleanTempFiles = () => {
+    const tempDir = path.join(__dirname, 'temp');
+    if (fs.existsSync(tempDir)) {
+        fs.readdirSync(tempDir).forEach(file => {
+            try {
+                fs.unlinkSync(path.join(tempDir, file));
+                console.log(`Cleaned up temp file: ${file}`);
+            } catch (err) {
+                console.error(`Error deleting temp file ${file}:`, err);
+            }
+        });
+    }
+};
+
+// Run cleanup on start
+cleanTempFiles();
 
 // Start the server
 app.listen(PORT, () => {
