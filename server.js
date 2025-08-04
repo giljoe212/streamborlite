@@ -54,11 +54,17 @@ app.post('/api/stream/start', async (req, res) => {
         if (videoUrl.includes('drive.google.com')) {
             const fileIdMatch = videoUrl.match(/[\w-]{20,}/);
             if (fileIdMatch && fileIdMatch[0]) {
-                processedUrl = `https://drive.google.com/uc?export=download&id=${fileIdMatch[0]}`;
+                const fileId = fileIdMatch[0];
+                // Gunakan API Google Drive v3 untuk mendapatkan download URL
+                processedUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=YOUR_API_KEY`;
+                
+                // Alternatif: Gunakan URL dengan konfirmasi
+                processedUrl = `https://drive.google.com/uc?export=download&confirm=t&id=${fileId}`;
+                
                 console.log('Converted Google Drive URL:', processedUrl);
             } else {
                 console.error('Invalid Google Drive URL format');
-                return res.status(400).json({ error: 'Invalid Google Drive URL format' });
+                return res.status(400).json({ error: 'Format URL Google Drive tidak valid. Pastikan URL berisi ID file yang benar.' });
             }
         }
 
