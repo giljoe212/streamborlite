@@ -1,0 +1,22 @@
+[build]
+builder = "nixpacks"
+
+[build.args]
+NIXPKGS_EXTRA = "ffmpeg"
+
+[deploy]
+startCommand = "npm start"
+
+[build.environment]
+NODE_ENV = "production"
+
+[build.environment.ffmpeg]
+version = "4.4.3"
+
+[build.environment.ffmpeg.codecs]
+libx264 = true
+libfdk_aac = true
+libvpx = true
+libvorbis = true
+libmp3lame = true
+libopus = true

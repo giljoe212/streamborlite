@@ -44,19 +44,28 @@ app.post('/api/stream/start', async (req, res) => {
     try {
         const rtmpUrl = `${streamUrl}/${streamKey}`;
         
-        // Start FFmpeg process
+        // Start FFmpeg process with stream copy (no re-encoding)
         const command = ffmpeg()
             .input(videoUrl)
             .inputOptions([
-                '-re',
-                '-stream_loop -1'  // Loop the input
+                '-re',              // Read input at native frame rate
+                '-stream_loop -1',  // Loop the input
+                '-copyts',          // Copy timestamps
+                '-start_at_zero'    // Start at zero timestamp
             ])
             .outputOptions([
                 '-c:v copy',        // Copy video codec (no re-encoding)
-                '-c:a aac',         // Convert audio to AAC
-                '-f flv'            // Output format
+                '-c:a aac',         // Convert audio to AAC (required for RTMP)
+                '-ar 44100',        // Audio sample rate
+                '-ac 2',            // Audio channels (stereo)
+                '-b:a 128k',        // Audio bitrate
+                '-f flv',           // Output format
+                '-flvflags no_duration_filesize'  // Fix for some RTMP servers
             ])
             .output(rtmpUrl)
+            .on('stderr', function(stderrLine) {
+                console.log('FFmpeg output: ' + stderrLine);
+            })
             .on('start', (commandLine) => {
                 console.log('FFmpeg command:', commandLine);
                 streamStatus = {
