@@ -58,6 +58,17 @@
                         </div>
                         <p class="mt-1 text-xs text-gray-500">Dapatkan Stream Key dari YouTube Studio > Live Streaming</p>
                     </div>
+                    <div class="mb-4">
+                        <label for="videoUrl" class="block text-gray-300 text-sm font-medium mb-2">Video URL (YouTube, Google Drive, or direct MP4)</label>
+                        <div class="flex">
+                            <input type="text" id="videoUrl" placeholder="https://youtube.com/watch?v=... or https://drive.google.com/..." class="flex-grow px-3 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <p class="mt-1 text-xs text-gray-400">
+                            <span class="font-semibold">YouTube:</span> https://youtube.com/watch?v=...<br>
+                            <span class="font-semibold">Google Drive:</span> https://drive.google.com/...<br>
+                            <span class="font-semibold">Direct MP4:</span> https://example.com/video.mp4
+                        </p>
+                    </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Video Source</label>
                         
@@ -173,10 +184,31 @@
             }
         }
 
+        // Validate video URL
+        function isValidVideoUrl(url) {
+            // Check for YouTube URL
+            if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+                return true;
+            }
+            
+            // Check for Google Drive URL
+            if (url.includes('drive.google.com')) {
+                return true;
+            }
+            
+            // Check for direct video URL
+            return url.match(/\.(mp4|webm|mov|avi|mkv|flv|wmv|m3u8|m3u|mpd|mpd\?.*|m3u8\?.*)(\?.*)?$/i);
+        }
+
         // Start stream
         startBtn.addEventListener('click', async () => {
             const streamKey = document.getElementById('streamKey').value.trim();
             const videoUrl = document.getElementById('videoUrl').value.trim();
+            
+            if (!isValidVideoUrl(videoUrl)) {
+                addLog('Error: URL video tidak valid. Gunakan URL YouTube, Google Drive, atau URL video langsung (MP4, WebM, dll)');
+                return;
+            }
 
             if (!streamKey || !videoUrl) {
                 alert('Harap isi Stream Key dan URL video');

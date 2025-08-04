@@ -5,11 +5,12 @@ const cors = require('cors');
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
-const multer = require('multer');
 const https = require('https');
+const multer = require('multer');
 const { promisify } = require('util');
 const stream = require('stream');
 const pipeline = promisify(stream.pipeline);
+const ytdl = require('ytdl-core');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -54,6 +55,27 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Function to get YouTube stream URL
+async function getYouTubeStreamUrl(url) {
+    try {
+        const info = await ytdl.getInfo(url);
+        // Get the highest quality format with both video and audio
+        const format = ytdl.chooseFormat(info.formats, { 
+            quality: 'highest',
+            filter: format => format.hasVideo && format.hasAudio
+        });
+        
+        if (!format) {
+            throw new Error('Tidak dapat menemukan format video yang sesuai');
+        }
+        
+        return format.url;
+    } catch (error) {
+        console.error('Error getting YouTube stream URL:', error);
+        throw new Error('Gagal mendapatkan URL streaming dari YouTube');
+    }
+}
+
 // Start streaming
 app.post('/api/stream/start', async (req, res) => {
     if (streamStatus.isStreaming) {
@@ -61,20 +83,22 @@ app.post('/api/stream/start', async (req, res) => {
     }
 
     const { streamKey, videoUrl } = req.body;
-    const streamUrl = 'rtmp://a.rtmp.youtube.com/live2';
-    
+
     if (!streamKey || !videoUrl) {
         return res.status(400).json({ error: 'Stream Key dan URL video harus diisi' });
     }
 
     try {
-        const rtmpUrl = `${streamUrl}/${streamKey}`;
-        
-                // Process Google Drive URL
         let processedUrl = videoUrl;
         
-        // Convert Google Drive sharing URL to direct download URL
-        if (videoUrl.includes('drive.google.com')) {
+        // Check if it's a YouTube URL
+        if (ytdl.validateURL(videoUrl)) {
+            console.log('Mendeteksi URL YouTube, mengambil URL streaming...');
+            processedUrl = await getYouTubeStreamUrl(videoUrl);
+            console.log('Berhasil mendapatkan URL streaming YouTube');
+        }
+        // Check if it's a Google Drive URL
+        else if (videoUrl.includes('drive.google.com')) {
             const fileIdMatch = videoUrl.match(/[\w-]{20,}/);
             if (fileIdMatch && fileIdMatch[0]) {
                 const fileId = fileIdMatch[0];
